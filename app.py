@@ -19,13 +19,7 @@ st.write(
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
 chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
-theme = st.toggle("🌙 Dark theme", value=False)
 
-# --- Theme styling ---
-if theme:
-    plt.style.use("dark_background")
-else:
-    plt.style.use("default")
 
 # --- Date setting ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
