@@ -4,8 +4,8 @@ from prophet import Prophet
 import matplotlib.pyplot as plt
 import pandas as pd
 from io import BytesIO
-import plotly.graph_objects as go
 from datetime import datetime
+import time
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="📈 Stock Forecast App", layout="centered")
@@ -18,7 +18,13 @@ st.write(
 # --- User Inputs ---
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
-chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
+theme = st.toggle("🌙 Dark theme", value=False)
+
+# --- Theme styling ---
+if theme:
+    plt.style.use("dark_background")
+else:
+    plt.style.use("default")
 
 # --- Date setting ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
@@ -27,27 +33,31 @@ three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
-        # 修正後（Open, High, Low, Close 全て含まれる）
+
         df_raw = yf.download(
             ticker,
             start=three_years_ago,
             end=pd.Timestamp.today(),
-            auto_adjust=False  # ← ここがポイント
+            auto_adjust=False
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
             st.error(f"No data found for {ticker}.")
-            return None, None, None, None
+            return None, None, None, None, None
 
         df = df_raw.reset_index()[["Date", "Close"]]
         df.columns = ["ds", "y"]
         df = df.dropna(subset=["y"])
+
+        start_time = time.time()
 
         model = Prophet(daily_seasonality=True)
         model.fit(df)
 
         future = model.make_future_dataframe(periods=forecast_days)
         forecast = model.predict(future)
+
+        elapsed_time = time.time() - start_time
 
         # --- Plot ---
         fig, ax = plt.subplots(figsize=(14, 6))
@@ -73,17 +83,19 @@ def forecast_stock_price(ticker, forecast_days=100):
         fig.savefig(buf, format="png")
         buf.seek(0)
 
-        return df_raw, forecast, fig, buf
+        return df_raw, forecast, fig, buf, elapsed_time
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
-        return None, None, None, None
+        return None, None, None, None, None
+
 
 # --- Main ---
 if st.button("Run Forecast"):
     if ticker:
-        df_raw, forecast, fig, buf = forecast_stock_price(ticker, forecast_days)
+        df_raw, forecast, fig, buf, elapsed_time = forecast_stock_price(ticker, forecast_days)
         if df_raw is not None:
+            # --- Show forecast summary ---
             last_day = forecast.iloc[-1]
             st.success(
                 f"📅 Forecast for {last_day['ds'].date()}: "
@@ -91,29 +103,11 @@ if st.button("Run Forecast"):
                 f"(Range: ${last_day['yhat_lower']:.2f} ~ ${last_day['yhat_upper']:.2f})"
             )
 
-            if chart_type == "Line":
-                st.pyplot(fig)
-            else:
-                if {"Open", "High", "Low", "Close"}.issubset(df_raw.columns):
-                    fig_candle = go.Figure(
-                        data=[
-                            go.Candlestick(
-                                x=df_raw.index,
-                                open=df_raw["Open"],
-                                high=df_raw["High"],
-                                low=df_raw["Low"],
-                                close=df_raw["Close"],
-                            )
-                        ]
-                    )
-                    fig_candle.update_layout(
-                        title=f"{ticker} Candlestick Chart",
-                        xaxis_title="Date",
-                        yaxis_title="Price (USD)",
-                    )
-                    st.plotly_chart(fig_candle)
-                else:
-                    st.warning("Candlestick chart could not be generated due to missing data.")
+            # --- Show elapsed time ---
+            st.caption(f"⏱️ Model trained in {elapsed_time:.2f} seconds")
+
+            # --- Show image chart by default ---
+            st.image(buf, caption=f"{ticker} Forecast", use_column_width=True)
 
             # --- Download buttons ---
             st.download_button(
