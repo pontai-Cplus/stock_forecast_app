@@ -36,10 +36,7 @@ def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
         df_raw = yf.download(
-            ticker,
-            start=three_years_ago,
-            end=pd.Timestamp.today(),
-            auto_adjust=True
+            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=True
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
@@ -59,7 +56,9 @@ def forecast_stock_price(ticker, forecast_days=100):
         # --- Plot ---
         fig, ax = plt.subplots(figsize=(14, 6))
         ax.plot(df["ds"], df["y"], label="Actual Price")
-        ax.plot(forecast["ds"], forecast["yhat"], label="Predicted Price", linestyle="--")
+        ax.plot(
+            forecast["ds"], forecast["yhat"], label="Predicted Price", linestyle="--"
+        )
         ax.fill_between(
             forecast["ds"],
             forecast["yhat_lower"],
@@ -102,14 +101,22 @@ if st.button("Run Forecast"):
             if chart_type == "Line":
                 st.pyplot(fig)
             else:
-                fig_candle = go.Figure(data=[go.Candlestick(
-                    x=df_raw.index,
-                    open=df_raw['Open'],
-                    high=df_raw['High'],
-                    low=df_raw['Low'],
-                    close=df_raw['Close']
-                )])
-                fig_candle.update_layout(title=f"{ticker} Candlestick Chart", xaxis_title="Date", yaxis_title="Price (USD)")
+                fig_candle = go.Figure(
+                    data=[
+                        go.Candlestick(
+                            x=df_raw.index,
+                            open=df_raw["Open"],
+                            high=df_raw["High"],
+                            low=df_raw["Low"],
+                            close=df_raw["Close"],
+                        )
+                    ]
+                )
+                fig_candle.update_layout(
+                    title=f"{ticker} Candlestick Chart",
+                    xaxis_title="Date",
+                    yaxis_title="Price (USD)",
+                )
                 st.plotly_chart(fig_candle)
 
             # --- Download buttons ---
@@ -117,12 +124,12 @@ if st.button("Run Forecast"):
                 label="📥 Download Forecast Image (PNG)",
                 data=buf,
                 file_name=f"{ticker}_stock_forecast.png",
-                mime="image/png"
+                mime="image/png",
             )
 
             st.download_button(
                 label="📄 Download Historical Data (CSV)",
                 data=df_raw.to_csv(index=True).encode("utf-8"),
                 file_name=f"{ticker}_historical_data.csv",
-                mime="text/csv"
+                mime="text/csv",
             )
