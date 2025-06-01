@@ -107,7 +107,7 @@ if st.button("Run Forecast"):
             st.caption(f"⏱️ Model trained in {elapsed_time:.2f} seconds")
 
             # --- Show image chart by default ---
-            st.image(buf, caption=f"{ticker} Forecast", use_column_width=True)
+            st.image(buf, caption=f"{ticker} Forecast", use_container_width=True)
 
             # --- Download buttons ---
             st.download_button(
