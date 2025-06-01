@@ -18,18 +18,17 @@ st.write(
 # --- User Inputs ---
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
-
+chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
 
 # --- Date setting ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
-
 
 # --- Forecasting function ---
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
         df_raw = yf.download(
-            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=True
+            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=False
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
@@ -76,13 +75,11 @@ def forecast_stock_price(ticker, forecast_days=100):
         st.error(f"An error occurred: {e}")
         return None, None, None, None
 
-
 # --- Main ---
 if st.button("Run Forecast"):
     if ticker:
         df_raw, forecast, fig, buf = forecast_stock_price(ticker, forecast_days)
         if df_raw is not None:
-            # --- Show forecast summary ---
             last_day = forecast.iloc[-1]
             st.success(
                 f"📅 Forecast for {last_day['ds'].date()}: "
@@ -90,27 +87,29 @@ if st.button("Run Forecast"):
                 f"(Range: ${last_day['yhat_lower']:.2f} ~ ${last_day['yhat_upper']:.2f})"
             )
 
-            # --- Chart ---
             if chart_type == "Line":
                 st.pyplot(fig)
             else:
-                fig_candle = go.Figure(
-                    data=[
-                        go.Candlestick(
-                            x=df_raw.index,
-                            open=df_raw["Open"],
-                            high=df_raw["High"],
-                            low=df_raw["Low"],
-                            close=df_raw["Close"],
-                        )
-                    ]
-                )
-                fig_candle.update_layout(
-                    title=f"{ticker} Candlestick Chart",
-                    xaxis_title="Date",
-                    yaxis_title="Price (USD)",
-                )
-                st.plotly_chart(fig_candle)
+                if {"Open", "High", "Low", "Close"}.issubset(df_raw.columns):
+                    fig_candle = go.Figure(
+                        data=[
+                            go.Candlestick(
+                                x=df_raw.index,
+                                open=df_raw["Open"],
+                                high=df_raw["High"],
+                                low=df_raw["Low"],
+                                close=df_raw["Close"],
+                            )
+                        ]
+                    )
+                    fig_candle.update_layout(
+                        title=f"{ticker} Candlestick Chart",
+                        xaxis_title="Date",
+                        yaxis_title="Price (USD)",
+                    )
+                    st.plotly_chart(fig_candle)
+                else:
+                    st.warning("Candlestick chart could not be generated due to missing data.")
 
             # --- Download buttons ---
             st.download_button(
