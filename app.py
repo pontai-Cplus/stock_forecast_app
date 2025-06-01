@@ -25,11 +25,11 @@ def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
         df_raw = yf.download(
-    ticker,
-    start=three_years_ago,
-    end=pd.Timestamp.today(),
-    auto_adjust=True
-)
+        ticker,
+        start=three_years_ago,
+        end=pd.Timestamp.today(),
+        auto_adjust=True
+        )
 
         if df_raw.empty or "Close" not in df_raw.columns:
             st.error(f"No data found for {ticker}.")
