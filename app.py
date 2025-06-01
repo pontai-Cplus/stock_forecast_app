@@ -6,6 +6,7 @@ import pandas as pd
 from io import BytesIO
 import plotly.graph_objects as go
 from datetime import datetime
+import time
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="📈 Stock Forecast App", layout="centered")
@@ -21,11 +22,6 @@ forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
 chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
 theme = st.toggle("🌙 Dark theme", value=False)
 
-# --- Theme styling ---
-if theme:
-    plt.style.use("dark_background")
-else:
-    plt.style.use("default")
 
 # --- Date setting ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
@@ -35,13 +31,16 @@ three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
+
+        start_time = time.time()
+
         df_raw = yf.download(
             ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=True
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
             st.error(f"No data found for {ticker}.")
-            return None, None, None, None
+            return None, None, None, None, None
 
         df = df_raw.reset_index()[["Date", "Close"]]
         df.columns = ["ds", "y"]
@@ -77,30 +76,32 @@ def forecast_stock_price(ticker, forecast_days=100):
         fig.savefig(buf, format="png")
         buf.seek(0)
 
-        return df_raw, forecast, fig, buf
+        elapsed_time = time.time() - start_time
+
+        return df_raw, forecast, fig, buf, elapsed_time
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
-        return None, None, None, None
+        return None, None, None, None, None
 
 
 # --- Main ---
 if st.button("Run Forecast"):
     if ticker:
-        df_raw, forecast, fig, buf = forecast_stock_price(ticker, forecast_days)
+        df_raw, forecast, fig, buf, elapsed_time = forecast_stock_price(ticker, forecast_days)
         if df_raw is not None:
-            # --- Show forecast summary ---
             last_day = forecast.iloc[-1]
             st.success(
                 f"📅 Forecast for {last_day['ds'].date()}: "
                 f"**${last_day['yhat']:.2f}** "
                 f"(Range: ${last_day['yhat_lower']:.2f} ~ ${last_day['yhat_upper']:.2f})"
             )
+            st.caption(f"⏱️ Forecast generated in {elapsed_time:.2f} seconds.")
 
-            # --- Chart ---
-            if chart_type == "Line":
-                st.pyplot(fig)
-            else:
+            # --- Show PNG image directly ---
+            st.image(buf, caption=f"{ticker} Forecast", use_column_width=True)
+
+            if chart_type == "Candlestick":
                 fig_candle = go.Figure(
                     data=[
                         go.Candlestick(
@@ -126,7 +127,6 @@ if st.button("Run Forecast"):
                 file_name=f"{ticker}_stock_forecast.png",
                 mime="image/png",
             )
-
             st.download_button(
                 label="📄 Download Historical Data (CSV)",
                 data=df_raw.to_csv(index=True).encode("utf-8"),
