@@ -27,8 +27,12 @@ three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
+        # 修正後（Open, High, Low, Close 全て含まれる）
         df_raw = yf.download(
-            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=False
+            ticker,
+            start=three_years_ago,
+            end=pd.Timestamp.today(),
+            auto_adjust=False  # ← ここがポイント
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
