@@ -3,9 +3,7 @@ import yfinance as yf
 from prophet import Prophet
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
-import tempfile
-import datetime
+from io import BytesIO
 
 # --- Streamlit 設定 ---
 st.set_page_config(page_title="📈 Stock Forecast App", layout="centered")
@@ -18,22 +16,24 @@ st.write(
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast Days", 30, 365, 100)
 
-
-# --- 処理関数 ---
+# --- 3年前からの開始日を定義 ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
+
+
+# --- 予測関数 ---
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
         df_raw = yf.download(
-        ticker,
-        start=three_years_ago,
-        end=pd.Timestamp.today(),
-        auto_adjust=True
+            ticker,
+            start=three_years_ago,
+            end=pd.Timestamp.today(),
+            auto_adjust=True
         )
 
         if df_raw.empty or "Close" not in df_raw.columns:
             st.error(f"No data found for {ticker}.")
-            return
+            return None, None
 
         df = df_raw.reset_index()[["Date", "Close"]]
         df.columns = ["ds", "y"]
@@ -45,12 +45,10 @@ def forecast_stock_price(ticker, forecast_days=100):
         future = model.make_future_dataframe(periods=forecast_days)
         forecast = model.predict(future)
 
-        # グラフ作成
+        # --- グラフ作成 ---
         fig, ax = plt.subplots(figsize=(14, 6))
         ax.plot(df["ds"], df["y"], label="Actual Price")
-        ax.plot(
-            forecast["ds"], forecast["yhat"], label="Predicted Price", linestyle="--"
-        )
+        ax.plot(forecast["ds"], forecast["yhat"], label="Predicted Price", linestyle="--")
         ax.fill_between(
             forecast["ds"],
             forecast["yhat_lower"],
@@ -65,22 +63,27 @@ def forecast_stock_price(ticker, forecast_days=100):
         ax.legend()
         ax.grid(True)
 
-        return fig
+        # --- メモリに画像を保存 ---
+        buf = BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+
+        return fig, buf
 
     except Exception as e:
         st.error(f"Error occurred: {e}")
-        return
+        return None, None
 
 
 # --- 実行 ---
 if st.button("Run Forecast"):
     if ticker:
-        fig = forecast_stock_price(ticker, forecast_days)
-        if fig:
+        fig, buf = forecast_stock_price(ticker, forecast_days)
+        if fig and buf:
             st.pyplot(fig)
             st.download_button(
-            label="📥 画像をダウンロード",
-            data=buf,
-            file_name=f"ticker_stock_forecast.png",
-            mime="image/png"
-        )
+                label="📥 画像をダウンロード",
+                data=buf,
+                file_name=f"{ticker}_stock_forecast.png",
+                mime="image/png"
+            )
