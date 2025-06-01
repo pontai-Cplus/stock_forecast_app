@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import tempfile
+import datetime
 
 # --- Streamlit 設定 ---
 st.set_page_config(page_title="📈 Stock Forecast App", layout="centered")
@@ -19,12 +20,16 @@ forecast_days = st.slider("Forecast Days", 30, 365, 100)
 
 
 # --- 処理関数 ---
+three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
         df_raw = yf.download(
-            ticker, start="2022-01-01", end=pd.Timestamp.today(), auto_adjust=True
-        )
+    ticker,
+    start=three_years_ago,
+    end=pd.Timestamp.today(),
+    auto_adjust=True
+)
 
         if df_raw.empty or "Close" not in df_raw.columns:
             st.error(f"No data found for {ticker}.")
