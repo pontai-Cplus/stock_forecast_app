@@ -18,7 +18,6 @@ st.write(
 # --- User Inputs ---
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
-chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
 
 
 # --- Date setting ---
