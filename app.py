@@ -20,7 +20,13 @@ st.write(
 ticker = st.text_input("Enter stock ticker:", value="AAPL").upper()
 forecast_days = st.slider("Forecast period (days):", 30, 365, 100)
 chart_type = st.radio("Select chart type:", ["Line", "Candlestick"], horizontal=True)
+theme = st.toggle("🌙 Dark theme", value=False)
 
+# --- Theme styling ---
+if theme:
+    plt.style.use("dark_background")
+else:
+    plt.style.use("default")
 
 # --- Date setting ---
 three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
@@ -34,13 +40,18 @@ def forecast_stock_price(ticker, forecast_days=100):
         start_time = time.time()
 
         df_raw = yf.download(
-            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=True
+            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=False
         )
 
-        if df_raw.empty or "Close" not in df_raw.columns:
-            st.error(f"No data found for {ticker}.")
+        # 必要なカラムがあるか確認
+        required_cols = {"Open", "High", "Low", "Close"}
+        if df_raw.empty or not required_cols.issubset(df_raw.columns):
+            st.error(f"No sufficient OHLC data found for {ticker}.")
             return None, None, None, None, None
 
+        df_raw = df_raw.dropna(subset=["Open", "High", "Low", "Close"])
+
+        # Prophet 用データ整形
         df = df_raw.reset_index()[["Date", "Close"]]
         df.columns = ["ds", "y"]
         df = df.dropna(subset=["y"])
@@ -51,7 +62,7 @@ def forecast_stock_price(ticker, forecast_days=100):
         future = model.make_future_dataframe(periods=forecast_days)
         forecast = model.predict(future)
 
-        # --- Plot ---
+        # --- Matplotlib 予測グラフ ---
         fig, ax = plt.subplots(figsize=(14, 6))
         ax.plot(df["ds"], df["y"], label="Actual Price")
         ax.plot(
@@ -97,27 +108,32 @@ if st.button("Run Forecast"):
             )
             st.caption(f"⏱️ Forecast generated in {elapsed_time:.2f} seconds.")
 
-            # --- Show PNG image directly ---
+            # --- Display forecast image by default ---
             st.image(buf, caption=f"{ticker} Forecast", use_column_width=True)
 
+            # --- Optional: Candlestick Chart ---
             if chart_type == "Candlestick":
-                fig_candle = go.Figure(
-                    data=[
-                        go.Candlestick(
-                            x=df_raw.index,
-                            open=df_raw["Open"],
-                            high=df_raw["High"],
-                            low=df_raw["Low"],
-                            close=df_raw["Close"],
-                        )
-                    ]
-                )
-                fig_candle.update_layout(
-                    title=f"{ticker} Candlestick Chart",
-                    xaxis_title="Date",
-                    yaxis_title="Price (USD)",
-                )
-                st.plotly_chart(fig_candle)
+                df_candle = df_raw.dropna(subset=["Open", "High", "Low", "Close"])
+                if not df_candle.empty:
+                    fig_candle = go.Figure(
+                        data=[
+                            go.Candlestick(
+                                x=df_candle.index,
+                                open=df_candle["Open"],
+                                high=df_candle["High"],
+                                low=df_candle["Low"],
+                                close=df_candle["Close"],
+                            )
+                        ]
+                    )
+                    fig_candle.update_layout(
+                        title=f"{ticker} Candlestick Chart",
+                        xaxis_title="Date",
+                        yaxis_title="Price (USD)",
+                    )
+                    st.plotly_chart(fig_candle)
+                else:
+                    st.warning("No sufficient OHLC data to show candlestick chart.")
 
             # --- Download buttons ---
             st.download_button(
