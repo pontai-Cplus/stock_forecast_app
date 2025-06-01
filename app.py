@@ -78,3 +78,9 @@ if st.button("Run Forecast"):
         fig = forecast_stock_price(ticker, forecast_days)
         if fig:
             st.pyplot(fig)
+            st.download_button(
+            label="📥 画像をダウンロード",
+            data=buf,
+            file_name=f"ticker_stock_forecast.png",
+            mime="image/png"
+        )
