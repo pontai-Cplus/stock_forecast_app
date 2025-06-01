@@ -6,8 +6,8 @@ import pandas as pd
 from io import BytesIO
 
 # --- Streamlit 設定 ---
-st.set_page_config(page_title="📈 Stock Forecast with Prophet model", layout="centered")
-st.title("📊 Stock Price Forecast")
+st.set_page_config(page_title="📈 Stock Forecast app", layout="centered")
+st.title("📊 Stock Price Forecast with Prophet model")
 st.write(
     "Enter any **stock ticker symbol** (e.g., `AAPL`, `TSLA`, `PLTR`) to predict its future price."
 )
