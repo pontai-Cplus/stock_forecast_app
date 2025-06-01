@@ -6,14 +6,13 @@ import pandas as pd
 from io import BytesIO
 import plotly.graph_objects as go
 from datetime import datetime
-import time
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="📈 Stock Forecast App", layout="centered")
 st.title("📊 Stock Price Forecast with Prophet")
 
 st.write(
-    "Enter a **stock ticker** (e.g., `AAPL`, `TSLA`, `GOOGL`) and generate a future price forecast using the Prophet model."
+    "Enter a **stock ticker** (e.g., AAPL, TSLA, GOOGL) and generate a future price forecast using the Prophet model."
 )
 
 # --- User Inputs ---
@@ -36,22 +35,14 @@ three_years_ago = (pd.Timestamp.today() - pd.DateOffset(years=3)).date()
 def forecast_stock_price(ticker, forecast_days=100):
     try:
         st.info(f"📥 Downloading data for {ticker}...")
-
-        start_time = time.time()
-
         df_raw = yf.download(
-            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=False
+            ticker, start=three_years_ago, end=pd.Timestamp.today(), auto_adjust=True
         )
 
-        # 必要なカラムがあるか確認
-        required_cols = {"Open", "High", "Low", "Close"}
-        if df_raw.empty or not required_cols.issubset(df_raw.columns):
-            st.error(f"No sufficient OHLC data found for {ticker}.")
-            return None, None, None, None, None
+        if df_raw.empty or "Close" not in df_raw.columns:
+            st.error(f"No data found for {ticker}.")
+            return None, None, None, None
 
-        df_raw = df_raw.dropna(subset=["Open", "High", "Low", "Close"])
-
-        # Prophet 用データ整形
         df = df_raw.reset_index()[["Date", "Close"]]
         df.columns = ["ds", "y"]
         df = df.dropna(subset=["y"])
@@ -62,7 +53,7 @@ def forecast_stock_price(ticker, forecast_days=100):
         future = model.make_future_dataframe(periods=forecast_days)
         forecast = model.predict(future)
 
-        # --- Matplotlib 予測グラフ ---
+        # --- Plot ---
         fig, ax = plt.subplots(figsize=(14, 6))
         ax.plot(df["ds"], df["y"], label="Actual Price")
         ax.plot(
@@ -86,54 +77,47 @@ def forecast_stock_price(ticker, forecast_days=100):
         fig.savefig(buf, format="png")
         buf.seek(0)
 
-        elapsed_time = time.time() - start_time
-
-        return df_raw, forecast, fig, buf, elapsed_time
+        return df_raw, forecast, fig, buf
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
-        return None, None, None, None, None
+        return None, None, None, None
 
 
 # --- Main ---
 if st.button("Run Forecast"):
     if ticker:
-        df_raw, forecast, fig, buf, elapsed_time = forecast_stock_price(ticker, forecast_days)
+        df_raw, forecast, fig, buf = forecast_stock_price(ticker, forecast_days)
         if df_raw is not None:
+            # --- Show forecast summary ---
             last_day = forecast.iloc[-1]
             st.success(
                 f"📅 Forecast for {last_day['ds'].date()}: "
                 f"**${last_day['yhat']:.2f}** "
                 f"(Range: ${last_day['yhat_lower']:.2f} ~ ${last_day['yhat_upper']:.2f})"
             )
-            st.caption(f"⏱️ Forecast generated in {elapsed_time:.2f} seconds.")
 
-            # --- Display forecast image by default ---
-            st.image(buf, caption=f"{ticker} Forecast", use_column_width=True)
-
-            # --- Optional: Candlestick Chart ---
-            if chart_type == "Candlestick":
-                df_candle = df_raw.dropna(subset=["Open", "High", "Low", "Close"])
-                if not df_candle.empty:
-                    fig_candle = go.Figure(
-                        data=[
-                            go.Candlestick(
-                                x=df_candle.index,
-                                open=df_candle["Open"],
-                                high=df_candle["High"],
-                                low=df_candle["Low"],
-                                close=df_candle["Close"],
-                            )
-                        ]
-                    )
-                    fig_candle.update_layout(
-                        title=f"{ticker} Candlestick Chart",
-                        xaxis_title="Date",
-                        yaxis_title="Price (USD)",
-                    )
-                    st.plotly_chart(fig_candle)
-                else:
-                    st.warning("No sufficient OHLC data to show candlestick chart.")
+            # --- Chart ---
+            if chart_type == "Line":
+                st.pyplot(fig)
+            else:
+                fig_candle = go.Figure(
+                    data=[
+                        go.Candlestick(
+                            x=df_raw.index,
+                            open=df_raw["Open"],
+                            high=df_raw["High"],
+                            low=df_raw["Low"],
+                            close=df_raw["Close"],
+                        )
+                    ]
+                )
+                fig_candle.update_layout(
+                    title=f"{ticker} Candlestick Chart",
+                    xaxis_title="Date",
+                    yaxis_title="Price (USD)",
+                )
+                st.plotly_chart(fig_candle)
 
             # --- Download buttons ---
             st.download_button(
@@ -142,6 +126,7 @@ if st.button("Run Forecast"):
                 file_name=f"{ticker}_stock_forecast.png",
                 mime="image/png",
             )
+
             st.download_button(
                 label="📄 Download Historical Data (CSV)",
                 data=df_raw.to_csv(index=True).encode("utf-8"),
